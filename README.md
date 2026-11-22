@@ -1,51 +1,45 @@
-# mend
+# mend — one patch tool for every AI edit format
 
-One patch tool for every AI edit format. `mend` applies an edit that an AI model
-wrote to a tree of text files, in four formats: a unified diff (often with wrong
-line numbers), SEARCH/REPLACE blocks, the V4A patch format, and text-editor tool
-calls as JSON. Every file is changed or nothing is.
+`mend` applies an AI-written edit to a tree of text files. It reads one patch and
+applies it atomically: every file changes, or none does.
+
+## Formats
+
+- **Unified diffs** — `diff --git` / `---` / `+++` sections with `@@` hunks. Line
+  numbers are often wrong, so hunks match by content, taking the occurrence
+  nearest the hunk's line number. Creates, deletes and renames are supported.
+- **SEARCH/REPLACE blocks** — `<<<<<<< SEARCH` / `=======` / `>>>>>>> REPLACE`,
+  with the file path on the line before the block. An empty old block creates a
+  file; a non-empty old block must occur exactly once.
+- **V4A patches** — `*** Begin Patch` / `*** Add File:` / `*** Delete File:` /
+  `*** Update File:` / `*** Move to:` / `@@` anchors / `*** End of File` /
+  `*** End Patch`, applied with a cursor that moves through the file.
+- **JSON tool calls** — one JSON array, or one edit object per line
+  (`create`, `str_replace`, `insert`).
+
+The format is detected automatically, or forced with `--format=NAME`.
+
+## Matching
+
+Old lines are matched at the first of three tiers that finds them: exact,
+ignoring trailing whitespace, or ignoring leading and trailing whitespace (with
+re-indentation of added lines). `--strict` uses the exact tier only.
 
 ## Usage
 
-```sh
-node main.ts [--format=NAME] [--check] [--strict] [PATCH]
-```
+    node main.ts [--format=NAME] [--check] [--strict] [PATCH]
 
-- The working directory is the root of the tree. Every path in a patch is relative to it.
-- `PATCH` is the path of the patch file, relative to the working directory. When
-  `PATCH` is absent or is `-`, the patch is read from standard input.
-- `--format=NAME` reads the patch in one format: `unified`, `search-replace`,
-  `v4a` or `json`; `auto`, the default, detects it.
-- `--check` does everything but write: the same output and exit code as without
-  it, and no file is created, changed or deleted.
-- `--strict` matches lines exactly (tier 0 only).
-- Options and `PATCH` may come in any order. `--` ends the options.
+`PATCH` is the patch file; without it, or with `-`, the patch is read from
+standard input. `--check` reports what would change without writing anything.
+Exit code 0 means the tree was written (or, with `--check`, would be written);
+exit 1 lists the edits that failed and writes nothing; exit 2 reports a usage,
+missing-patch, format or parse error.
 
-Exit codes: `0` the tree is written, `1` one or more edits failed (nothing is
-written; every failure is reported), `2` a usage, no-patch, format or parse error.
+## Files
 
-See `SPEC.md` for the full specification.
+- `main.ts` — the whole tool (Node 22+, standard library only).
+- `runner.ts` — the kit's trial runner (unchanged).
+- `SPEC.md` — the specification, version 1.
 
-## How it works
-
-- Line matching runs at three tiers: exact, ignoring trailing whitespace, then
-  ignoring leading and trailing whitespace with re-indentation of added lines.
-- Unified hunks find the occurrence nearest to their (often wrong) line number,
-  handle empty-old insertions, `\ No newline at end of file`, creation, deletion
-  and moves.
-- SEARCH/REPLACE blocks take their path from the line before the marker (or the
-  previous block's path) and fail as ambiguous when the old text occurs twice.
-- V4A sections support Add, Delete and Update files, `Move to`, anchors and a
-  cursor, and `End of File` chunks.
-- Edits apply in order to the tree as earlier edits left it; a failed edit
-  changes nothing, later edits still run, and when any edit failed no file is
-  written at all.
-
-## Requirements
-
-Node 22 and its standard library alone; nothing is installed. Deterministic:
-the same run gives the same exit code, stdout and files every time.
-
-## License
-
-MIT. See `LICENSE`.
+Run the practice set with `node check.ts <practice.json>` (check.ts is not part
+of the repository; copy it in from the kit when testing).
